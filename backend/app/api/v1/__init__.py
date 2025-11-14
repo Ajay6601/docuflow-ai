@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import documents, websocket
+from app.api.v1 import documents, websocket, search
 
 api_router = APIRouter()
 
@@ -14,4 +14,11 @@ api_router.include_router(
 api_router.include_router(
     websocket.router,
     tags=["websocket"]
+)
+
+# Include search routes
+api_router.include_router(
+    search.router,
+    prefix="/search",
+    tags=["search"]
 )

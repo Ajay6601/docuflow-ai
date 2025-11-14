@@ -61,3 +61,22 @@ class ExtractionResult(BaseModel):
     status: DocumentStatus
     document_type: Optional[DocumentType] = None
     summary: Optional[str] = None
+
+
+class BatchUploadResponse(BaseModel):
+    total_uploaded: int
+    successful: int
+    failed: int
+    documents: List[DocumentResponse]
+    errors: List[Dict[str, str]] = []
+
+
+class BatchProcessRequest(BaseModel):
+    document_ids: List[int]
+    use_ai: bool = True
+
+
+class BatchStatusResponse(BaseModel):
+    total: int
+    summary: Dict[str, int]
+    documents: List[Dict[str, Any]]

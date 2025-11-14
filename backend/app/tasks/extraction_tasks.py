@@ -6,6 +6,7 @@ from app.services.storage import storage_service
 from app.services.extraction import extraction_service
 from app.services.ai_service import ai_service
 from app.services.notification_service import notification_service
+from app.services.search_service import search_service
 import logging
 import time
 import asyncio
@@ -134,6 +135,14 @@ def process_document(self, document_id: int, use_ai: bool = True):
         document.processing_time = time.time() - start_time
         document.extraction_error = None
         db.commit()
+
+        logger.info(f"Generating search indexes for document {document_id}")
+        try:
+            search_service.update_search_vector(db, document_id)
+            search_service.update_embedding(db, document_id)
+        except Exception as search_error:
+            logger.error(f"Error generating search indexes: {search_error}")
+            # Don't fail the task if search indexing fails
         
         # Notify: Processing completed
         run_async(notification_service.notify_processing_completed(

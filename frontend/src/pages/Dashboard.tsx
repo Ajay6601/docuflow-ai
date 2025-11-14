@@ -1,0 +1,167 @@
+import React, { useState } from 'react'
+import { FileText, Upload as UploadIcon, Search as SearchIcon } from 'lucide-react'
+import { UploadZone } from '../components/documents/UploadZone'
+import { DocumentList } from '../components/documents/DocumentList'
+import { SearchBar } from '../components/documents/SearchBar'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { useWebSocket } from '../hooks/useWebSocket'
+
+export const Dashboard: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'documents' | 'upload' | 'search'>('documents')
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const { isConnected, messages } = useWebSocket()
+
+  const handleUploadSuccess = () => {
+    setRefreshTrigger(prev => prev + 1)
+    setActiveTab('documents')
+  }
+
+  // Listen for WebSocket updates
+  React.useEffect(() => {
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage && lastMessage.type === 'document_status') {
+      // Refresh document list when status changes
+      if (lastMessage.status === 'completed' || lastMessage.status === 'failed') {
+        setRefreshTrigger(prev => prev + 1)
+      }
+    }
+  }, [messages])
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary rounded-lg">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">DocuFlow AI</h1>
+                <p className="text-sm text-gray-500">Enterprise Document Intelligence</p>
+              </div>
+            </div>
+
+            {/* WebSocket Status */}
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm text-gray-600">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-8">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('documents')}
+            className={`
+              px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2
+              ${activeTab === 'documents' 
+                ? 'bg-primary text-white' 
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+              }
+            `}
+          >
+            <FileText className="h-4 w-4" />
+            Documents
+          </button>
+
+          <button
+            onClick={() => setActiveTab('upload')}
+            className={`
+              px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2
+              ${activeTab === 'upload' 
+                ? 'bg-primary text-white' 
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+              }
+            `}
+          >
+            <UploadIcon className="h-4 w-4" />
+            Upload
+          </button>
+
+          <button
+            onClick={() => setActiveTab('search')}
+            className={`
+              px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2
+              ${activeTab === 'search' 
+                ? 'bg-primary text-white' 
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+              }
+            `}
+          >
+            <SearchIcon className="h-4 w-4" />
+            Search
+          </button>
+        </div>
+
+        {/* Content */}
+        <div>
+          {activeTab === 'documents' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>All Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DocumentList refreshTrigger={refreshTrigger} />
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'upload' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Upload Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <UploadZone onUploadSuccess={handleUploadSuccess} />
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'search' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Search Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SearchBar />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Recent Activity (WebSocket Messages) */}
+        {messages.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {messages.slice(-5).reverse().map((msg, index) => (
+                  <div key={index} className="text-sm p-2 bg-gray-50 rounded">
+                    {msg.type === 'document_status' && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Document {msg.document_id}:</span>
+                        <span>{msg.message}</span>
+                        {msg.progress !== undefined && (
+                          <span className="text-gray-500">({msg.progress}%)</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}

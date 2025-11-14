@@ -25,14 +25,15 @@ class Settings(BaseSettings):
     # File Upload
     MAX_FILE_SIZE: int = 52428800
     ALLOWED_FILE_TYPES: List[str] = [
-        "application/pdf",
-        "image/png",
-        "image/jpeg",
-        "image/jpg",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "message/rfc822"
-    ]
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "message/rfc822",
+    "text/plain"  # NEW - for testing
+]
     
     # Celery/Redis
     REDIS_URL: str = "redis://localhost:6379/0"

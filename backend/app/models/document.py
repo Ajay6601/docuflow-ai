@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, BigInteger, Text, Float, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, BigInteger, Text, Float, JSON, Index
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import TSVECTOR
+from pgvector.sqlalchemy import Vector
 from app.database import Base
 import enum
 
@@ -33,9 +35,10 @@ class Document(Base):
     file_type = Column(String(100), nullable=False)
     storage_path = Column(String(500), nullable=False)
     
+    # FIX: Just use String type with the native PostgreSQL enum
     status = Column(
-        SQLEnum(DocumentStatus),
-        default=DocumentStatus.UPLOADED,
+        String(50),
+        default="uploaded",
         nullable=False,
         index=True
     )
@@ -51,20 +54,29 @@ class Document(Base):
     retry_count = Column(Integer, default=0)
     processing_time = Column(Float, nullable=True)
     
-    # NEW - AI fields
+    # AI fields
     document_type = Column(
-        SQLEnum(DocumentType),
-        default=DocumentType.UNKNOWN,
+        String(50),
+        default="unknown",
         nullable=False,
         index=True
     )
-    document_type_confidence = Column(Float, nullable=True)  # 0.0 to 1.0
-    extracted_data = Column(JSON, nullable=True)  # Structured data as JSON
-    summary = Column(Text, nullable=True)  # AI-generated summary
-    ai_processing_cost = Column(Float, nullable=True)  # Cost in USD
+    document_type_confidence = Column(Float, nullable=True)
+    extracted_data = Column(JSON, nullable=True)
+    summary = Column(Text, nullable=True)
+    ai_processing_cost = Column(Float, nullable=True)
+    
+    # Search fields
+    search_vector = Column(TSVECTOR, nullable=True)
+    embedding = Column(Vector(384), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Indexes
+    __table_args__ = (
+        Index('ix_documents_search_vector', 'search_vector', postgresql_using='gin'),
+    )
     
     def __repr__(self):
         return f"<Document(id={self.id}, filename={self.filename}, type={self.document_type}, status={self.status})>"

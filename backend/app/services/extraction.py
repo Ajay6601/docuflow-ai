@@ -105,6 +105,65 @@ class ExtractionService:
             logger.error(f"Error extracting from DOCX: {e}")
             raise
     
+
+    @staticmethod
+    def extract_from_text(file_data: bytes) -> Tuple[str, str]:
+        """
+        Extract text from plain text file.
+        
+        Returns:
+            Tuple of (extracted_text, method_used)
+        """
+        try:
+            # Try UTF-8 first
+            try:
+                text = file_data.decode('utf-8')
+            except UnicodeDecodeError:
+                # Fallback to latin-1
+                text = file_data.decode('latin-1', errors='ignore')
+            
+            return text.strip(), "text"
+            
+        except Exception as e:
+            logger.error(f"Error extracting from text file: {e}")
+            raise
+
+    @staticmethod
+    def extract_text(file_data: bytes, mime_type: str) -> Tuple[Optional[str], Optional[int], Optional[str], Optional[str]]:
+        """
+        Main extraction method that routes to appropriate extractor.
+        """
+        try:
+            if mime_type == "application/pdf":
+                text, page_count, method = ExtractionService.extract_from_pdf(file_data)
+                return text, page_count, method, None
+            
+            elif mime_type in ["image/png", "image/jpeg", "image/jpg"]:
+                text, method = ExtractionService.extract_from_image(file_data)
+                return text, None, method, None
+            
+            elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                text, method = ExtractionService.extract_from_docx(file_data)
+                return text, None, method, None
+            
+            elif mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                text, method = ExtractionService.extract_from_xlsx(file_data)
+                return text, None, method, None
+            
+            # NEW - Handle text files
+            elif mime_type == "text/plain":
+                text, method = ExtractionService.extract_from_text(file_data)
+                return text, None, method, None
+            
+            else:
+                return None, None, None, f"Unsupported file type for extraction: {mime_type}"
+                
+        except Exception as e:
+            error_msg = f"Extraction failed: {str(e)}"
+            logger.error(error_msg)
+            return None, None, None, error_msg
+
+
     @staticmethod
     def extract_from_xlsx(file_data: bytes) -> Tuple[str, str]:
         """

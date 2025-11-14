@@ -1,0 +1,70 @@
+SARAH JOHNSON
+Full Stack Software Engineer
+
+Contact Information:
+Email: sarah.johnson@email.com
+Phone: (555) 987-6543
+Location: Austin, Texas
+LinkedIn: linkedin.com/in/sarahjohnson
+GitHub: github.com/sjohnson
+
+PROFESSIONAL SUMMARY
+Passionate software engineer with 6+ years of experience building scalable web applications 
+and microservices. Expert in Python, JavaScript, and cloud technologies. Strong background 
+in backend development, API design, and database optimization. Proven track record of 
+delivering high-quality solutions in fast-paced startup environments.
+
+TECHNICAL SKILLS
+Languages: Python, JavaScript, TypeScript, SQL, Java, Go
+Frameworks: FastAPI, Django, React, Node.js, Express, Flask
+Databases: PostgreSQL, MongoDB, Redis, MySQL, Elasticsearch
+Cloud & DevOps: AWS (EC2, S3, Lambda, RDS), Docker, Kubernetes, CI/CD, Jenkins
+Tools: Git, Linux, Nginx, RabbitMQ, Celery, GraphQL
+AI/ML: OpenAI API, TensorFlow, scikit-learn, pandas, NumPy
+
+PROFESSIONAL EXPERIENCE
+
+Senior Software Engineer | CloudStart Technologies | Austin, TX
+June 2021 - Present
+- Led development of document processing platform handling 1M+ documents monthly
+- Architected microservices-based system using FastAPI, Celery, and PostgreSQL
+- Implemented real-time WebSocket notifications reducing user wait time by 70%
+- Integrated OpenAI API for intelligent document classification with 95% accuracy
+- Optimized database queries resulting in 60% performance improvement
+- Mentored 3 junior engineers and conducted code reviews
+
+Software Engineer | DataFlow Solutions | Remote
+March 2019 - May 2021
+- Built RESTful APIs serving 500K+ daily requests with 99.9% uptime
+- Developed React-based admin dashboard with real-time analytics
+- Implemented OAuth2 authentication and role-based access control
+- Created automated testing suite achieving 85% code coverage
+- Reduced deployment time by 50% through CI/CD pipeline optimization
+
+Junior Software Engineer | StartupHub Inc. | San Francisco, CA
+July 2018 - February 2019
+- Developed features for e-commerce platform using Django and React
+- Integrated payment gateways (Stripe, PayPal) processing $2M+ annually
+- Implemented search functionality using Elasticsearch
+- Collaborated with design team to improve user experience
+
+EDUCATION
+
+Bachelor of Science in Computer Science
+University of Texas at Austin | 2014 - 2018
+GPA: 3.8/4.0
+
+CERTIFICATIONS
+- AWS Certified Solutions Architect - Associate (2022)
+- MongoDB Certified Developer (2021)
+
+PROJECTS
+
+Open Source Contributions:
+- Contributor to FastAPI framework (20+ merged PRs)
+- Maintained popular Python package with 5K+ downloads/month
+
+Personal Projects:
+- AI-Powered Recipe Generator - Web app using GPT-4 API (React, FastAPI)
+- Real-time Chat Application - WebSocket-based messenger (Node.js, Socket.io)
+- Stock Market Dashboard - Live data visualization (Python, Plotly)
