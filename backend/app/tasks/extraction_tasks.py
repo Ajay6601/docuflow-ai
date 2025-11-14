@@ -5,8 +5,10 @@ from app.models.document import Document, DocumentStatus
 from app.services.storage import storage_service
 from app.services.extraction import extraction_service
 from app.services.ai_service import ai_service
+from app.services.notification_service import notification_service
 import logging
 import time
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +21,22 @@ class DatabaseTask(Task):
         pass
 
 
+def run_async(coro):
+    """Helper to run async functions in sync context."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(coro)
+
+
 @celery_app.task(bind=True, base=DatabaseTask, name='app.tasks.extraction_tasks.process_document')
 def process_document(self, document_id: int, use_ai: bool = True):
     """
     Background task to extract text and process with AI.
-    
-    Args:
-        document_id: ID of the document to process
-        use_ai: Whether to use AI for classification and extraction
+    Now with real-time WebSocket notifications!
     """
     db = SessionLocal()
     start_time = time.time()
@@ -49,6 +59,9 @@ def process_document(self, document_id: int, use_ai: bool = True):
         # Download file from storage
         file_data = storage_service.download_file(document.storage_path)
         
+        # Notify: Extraction started
+        run_async(notification_service.notify_extraction_started(document_id))
+        
         # Step 1: Extract text
         extracted_text, page_count, method, error = extraction_service.extract_text(
             file_data, document.file_type
@@ -61,6 +74,9 @@ def process_document(self, document_id: int, use_ai: bool = True):
             document.processing_time = time.time() - start_time
             db.commit()
             
+            # Notify: Extraction failed
+            run_async(notification_service.notify_processing_failed(document_id, error))
+            
             logger.error(f"Extraction failed for document {document_id}: {error}")
             raise Exception(f"Extraction failed: {error}")
         
@@ -70,10 +86,18 @@ def process_document(self, document_id: int, use_ai: bool = True):
         document.extraction_method = method
         db.commit()
         
+        # Notify: Extraction completed
+        run_async(notification_service.notify_extraction_completed(
+            document_id, method, page_count
+        ))
+        
         logger.info(f"Text extraction completed for document {document_id}")
         
         # Step 2: AI Processing (if enabled and text available)
         if use_ai and extracted_text and len(extracted_text.strip()) > 50:
+            # Notify: AI processing started
+            run_async(notification_service.notify_ai_processing_started(document_id))
+            
             logger.info(f"Starting AI processing for document {document_id}")
             
             try:
@@ -84,6 +108,14 @@ def process_document(self, document_id: int, use_ai: bool = True):
                 document.extracted_data = ai_result["extracted_data"]
                 document.summary = ai_result["summary"]
                 document.ai_processing_cost = ai_result["ai_processing_cost"]
+                db.commit()
+                
+                # Notify: AI classification completed
+                run_async(notification_service.notify_ai_classification_completed(
+                    document_id,
+                    ai_result["document_type"],
+                    ai_result["document_type_confidence"]
+                ))
                 
                 logger.info(
                     f"AI processing completed for document {document_id}: "
@@ -94,14 +126,21 @@ def process_document(self, document_id: int, use_ai: bool = True):
                 
             except Exception as ai_error:
                 logger.error(f"AI processing failed for document {document_id}: {ai_error}")
-                # Don't fail the whole task if just AI fails
                 document.extraction_error = f"AI processing error: {str(ai_error)}"
+                db.commit()
         
         # Mark as completed
         document.status = DocumentStatus.COMPLETED
         document.processing_time = time.time() - start_time
         document.extraction_error = None
         db.commit()
+        
+        # Notify: Processing completed
+        run_async(notification_service.notify_processing_completed(
+            document_id,
+            document.processing_time,
+            document.document_type
+        ))
         
         logger.info(
             f"Processing completed for document {document_id} "
@@ -129,6 +168,7 @@ def process_document(self, document_id: int, use_ai: bool = True):
             # If max retries reached, mark as failed
             if document.retry_count >= 3:
                 document.status = DocumentStatus.FAILED
+                run_async(notification_service.notify_processing_failed(document_id, str(e)))
                 logger.error(f"Max retries reached for document {document_id}")
             
             db.commit()
@@ -147,13 +187,7 @@ def process_document(self, document_id: int, use_ai: bool = True):
 
 @celery_app.task(name='app.tasks.extraction_tasks.process_document_batch')
 def process_document_batch(document_ids: list[int], use_ai: bool = True):
-    """
-    Process multiple documents in batch.
-    
-    Args:
-        document_ids: List of document IDs to process
-        use_ai: Whether to use AI processing
-    """
+    """Process multiple documents in batch."""
     results = []
     
     for doc_id in document_ids:

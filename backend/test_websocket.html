@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuFlow AI - WebSocket Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        button.primary {
+            background: #007bff;
+            color: white;
+        }
+        button.danger {
+            background: #dc3545;
+            color: white;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+        }
+        #messages {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .message {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            background: white;
+        }
+        .message.status {
+            border-left-color: #28a745;
+        }
+        .message.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 DocuFlow AI - WebSocket Test Client</h1>
+        
+        <div id="status" class="status disconnected">
+            ⚫ Disconnected
+        </div>
+
+        <div class="controls">
+            <button id="connectBtn" class="primary" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" class="danger" onclick="disconnect()" disabled>Disconnect</button>
+            <input type="number" id="documentId" placeholder="Document ID (optional)" />
+            <button class="primary" onclick="subscribe()">Subscribe to Document</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📨 Messages</h2>
+        <button onclick="clearMessages()" style="margin-bottom: 10px;">Clear Messages</button>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let connectionId = null;
+
+        function connect() {
+            const wsUrl = 'ws://localhost:8000/api/v1/ws';
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                updateStatus(true);
+                addMessage('Connected to WebSocket server', 'status');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'connection') {
+                    connectionId = data.connection_id;
+                    addMessage(`Connection ID: ${connectionId}`, 'status');
+                }
+                
+                addMessage(JSON.stringify(data, null, 2));
+                
+                // Special formatting for document status updates
+                if (data.type === 'document_status') {
+                    const progress = data.progress || 0;
+                    const status = data.status;
+                    const msg = data.message || '';
+                    
+                    console.log(`Document ${data.document_id}: ${status} (${progress}%) - ${msg}`);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                addMessage('WebSocket Error: ' + error, 'error');
+            };
+            
+            ws.onclose = function(event) {
+                updateStatus(false);
+                addMessage('Disconnected from WebSocket server', 'error');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function subscribe() {
+            const docId = document.getElementById('documentId').value;
+            
+            if (!ws) {
+                alert('Please connect first!');
+                return;
+            }
+            
+            if (!docId) {
+                alert('Please enter a document ID!');
+                return;
+            }
+            
+            ws.send(JSON.stringify({
+                type: 'subscribe',
+                document_id: parseInt(docId)
+            }));
+            
+            addMessage(`Subscribing to document ${docId}...`, 'status');
+        }
+
+        function updateStatus(connected) {
+            const statusEl = document.getElementById('status');
+            if (connected) {
+                statusEl.className = 'status connected';
+                statusEl.textContent = '🟢 Connected';
+            } else {
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = '⚫ Disconnected';
+            }
+        }
+
+        function addMessage(text, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message ' + type;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageEl.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <pre style="margin: 5px 0 0 0; white-space: pre-wrap;">${text}</pre>
+            `;
+            
+            messagesDiv.appendChild(messageEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        // Auto-connect on load
+        window.onload = function() {
+            // Uncomment to auto-connect
+            // connect();
+        };
+    </script>
+</body>
+</html>
