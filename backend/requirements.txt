@@ -39,3 +39,5 @@ passlib[bcrypt]
 python-multipart
 
 slowapi
+locust 
+faker

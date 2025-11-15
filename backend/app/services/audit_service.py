@@ -19,7 +19,7 @@ class AuditService:
         resource_type: Optional[str] = None,
         resource_id: Optional[int] = None,
         description: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,  # Keep parameter name for backward compatibility
         request: Optional[Request] = None,
         status: str = "success",
         error_message: Optional[str] = None
@@ -46,7 +46,7 @@ class AuditService:
                 resource_type=resource_type,
                 resource_id=resource_id,
                 description=description,
-                metadata=metadata,
+                details=metadata,  # CHANGED: store in 'details' column
                 ip_address=ip_address,
                 user_agent=user_agent,
                 request_method=request_method,

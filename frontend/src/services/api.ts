@@ -48,9 +48,14 @@ export const authApi = {
 
   // Login - UPDATED to use JSON endpoint
   login: async (username: string, password: string) => {
-    const response = await api.post('/auth/login/json', {
-      username,
-      password,
+    const formData = new URLSearchParams()
+    formData.append('username', username)
+    formData.append('password', password)
+
+    const response = await api.post('/auth/login', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     })
     return response.data
   },
@@ -62,7 +67,7 @@ export const authApi = {
   },
 
   // Logout
-  logout: async () => {
+   logout: async () => {
     const response = await api.post('/auth/logout')
     return response.data
   },

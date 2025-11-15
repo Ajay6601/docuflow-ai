@@ -35,16 +35,16 @@ class AuditLog(Base):
     
     # Who performed the action
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
-    username = Column(String(100), nullable=True)  # Denormalized for performance
+    username = Column(String(100), nullable=True)
     
     # What action was performed
     action = Column(String(50), nullable=False, index=True)
-    resource_type = Column(String(50), nullable=True)  # document, user, etc.
-    resource_id = Column(Integer, nullable=True)  # ID of the resource
+    resource_type = Column(String(50), nullable=True)
+    resource_id = Column(Integer, nullable=True)
     
     # Details
     description = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)  # Additional context
+    details = Column(JSON, nullable=True)  # CHANGED from 'metadata' to 'details'
     
     # Request info
     ip_address = Column(String(45), nullable=True)
@@ -53,7 +53,7 @@ class AuditLog(Base):
     request_path = Column(String(500), nullable=True)
     
     # Status
-    status = Column(String(20), nullable=False, default="success")  # success, failed, error
+    status = Column(String(20), nullable=False, default="success")
     error_message = Column(Text, nullable=True)
     
     # Timestamp

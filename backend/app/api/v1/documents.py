@@ -1,23 +1,488 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+# from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+# from fastapi.responses import StreamingResponse
+# from sqlalchemy.orm import Session
+# from typing import List, Optional
+# from io import BytesIO
+# import logging
+# # from app.tasks.extraction_tasks import process_document
+# from app.celery_app import celery_app
+# from app.tasks import extraction_tasks
+# from app.database import get_db
+# from app.models.document import Document, DocumentStatus
+# from app.schemas.document import DocumentResponse, DocumentList, ExtractionResult
+# from app.services.storage import storage_service
+# from app.services.extraction import extraction_service
+# from app.services.ai_service import ai_service
+# from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
+# from app.middleware.rate_limit import limiter
+# from app.services.audit_service import audit_service
+# from app.models.audit_log import AuditAction
+
+# from app.utils.file_utils import (
+#     generate_unique_filename,
+#     generate_storage_path,
+#     detect_file_type,
+#     validate_file_size,
+#     validate_file_type,
+#     format_file_size
+# )
+# from app.config import settings
+# from app.tasks.extraction_tasks import process_document
+# from app.dependencies import get_current_user, get_optional_user
+# from app.models.user import User
+
+# router = APIRouter()
+# logger = logging.getLogger(__name__)
+
+
+# @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+# async def upload_document(
+#     request: Request,
+#     file: UploadFile = File(...),
+#     process_async: bool = Form(default=True),
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Upload a document file (requires authentication).
+    
+#     - process_async=True: Process in background (recommended for large files)
+#     - process_async=False: Process immediately (blocks until complete)
+#     """
+#     try:
+#         # Read file content
+#         file_content = await file.read()
+#         file_size = len(file_content)
+        
+#         # Validate file size
+#         if not validate_file_size(file_size):
+#             raise HTTPException(
+#                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+#                 detail=f"File too large. Maximum size is {format_file_size(settings.MAX_FILE_SIZE)}"
+#             )
+        
+#         # Detect actual file type
+#         detected_mime_type = detect_file_type(file_content, file.filename)
+        
+#         # Validate file type
+#         if not validate_file_type(detected_mime_type):
+#             raise HTTPException(
+#                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+#                 detail=f"File type '{detected_mime_type}' not supported."
+#             )
+        
+#         # Generate unique filename and storage path
+#         unique_filename = generate_unique_filename(file.filename)
+#         storage_path = generate_storage_path(unique_filename)
+        
+#         # Upload to MinIO
+#         storage_service.upload_file(
+#             file_data=file_content,
+#             object_name=storage_path,
+#             content_type=detected_mime_type,
+#             metadata={
+#                 "original_filename": file.filename,
+#                 "uploaded_by": current_user.username
+#             }
+#         )
+        
+#         # Create document record
+#         db_document = Document(
+#             filename=unique_filename,
+#             original_filename=file.filename,
+#             file_size=file_size,
+#             file_type=detected_mime_type,
+#             storage_path=storage_path,
+#             status=DocumentStatus.UPLOADED,
+#             user_id=current_user.id
+#         )
+        
+#         db.add(db_document)
+#         db.commit()
+#         db.refresh(db_document)
+        
+#         logger.info(f"Document uploaded successfully by user {current_user.username}: {db_document.id} - {file.filename}")
+        
+#         # Process extraction
+#         if process_async:
+#             # Queue background task
+#             # task = process_document.delay(db_document.id, use_ai=True)
+#             task = celery_app.send_task(
+#             'app.tasks.extraction_tasks.process_document',
+#             args=[db_document.id, True]
+#         )
+#             db_document.task_id = task.id
+#             db_document.status = DocumentStatus.PROCESSING
+#             db.commit()
+#             db.refresh(db_document)
+            
+#             logger.info(f"Queued extraction task {task.id} for document {db_document.id}")
+#         else:
+#             # Process immediately (synchronous)
+#             try:
+#                 db_document.status = DocumentStatus.PROCESSING
+#                 db.commit()
+                
+#                 extracted_text, page_count, method, error = extraction_service.extract_text(
+#                     file_content, detected_mime_type
+#                 )
+                
+#                 if error:
+#                     db_document.status = DocumentStatus.FAILED
+#                     db_document.extraction_error = error
+#                 else:
+#                     db_document.status = DocumentStatus.COMPLETED
+#                     db_document.extracted_text = extracted_text
+#                     db_document.page_count = page_count
+#                     db_document.extraction_method = method
+                
+#                 db.commit()
+#                 db.refresh(db_document)
+                
+#             except Exception as e:
+#                 logger.error(f"Error during immediate extraction: {e}")
+#                 db_document.status = DocumentStatus.FAILED
+#                 db_document.extraction_error = str(e)
+#                 db.commit()
+        
+#         db.refresh(db_document)
+
+#         audit_service.log(
+#         db=db,
+#         action=AuditAction.DOCUMENT_UPLOAD,
+#         user=current_user,
+#         resource_type="document",
+#         resource_id=db_document.id,
+#         description=f"Uploaded document: {file.filename}",
+#         metadata={
+#             "filename": file.filename,
+#             "file_size": file_size,
+#             "file_type": detected_mime_type
+#         },
+#         request=request
+#     )
+    
+#         return db_document
+
+        
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Error uploading document: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"Failed to upload document: {str(e)}"
+#         )
+
+
+# @router.post("/{document_id}/process", response_model=DocumentResponse)
+# def reprocess_document(
+#     document_id: int,
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Queue a document for reprocessing (only if user owns it).
+#     """
+#     document = db.query(Document).filter(
+#         Document.id == document_id,
+#         Document.user_id == current_user.id
+#     ).first()
+    
+#     if not document:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Document with id {document_id} not found"
+#         )
+    
+#     # Queue background task
+#     task = process_document.delay(document.id, use_ai=True)
+#     document.task_id = task.id
+#     document.status = DocumentStatus.PROCESSING
+#     document.retry_count = 0
+#     document.extraction_error = None
+    
+#     db.commit()
+#     db.refresh(document)
+    
+#     logger.info(f"Queued reprocessing task {task.id} for document {document_id}")
+    
+#     return document
+
+
+# @router.get("/{document_id}/status")
+# def get_document_status(
+#     document_id: int,
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Get the current processing status of a document.
+#     """
+#     document = db.query(Document).filter(
+#         Document.id == document_id,
+#         Document.user_id == current_user.id
+#     ).first()
+    
+#     if not document:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Document with id {document_id} not found"
+#         )
+    
+#     return {
+#         "document_id": document.id,
+#         "status": document.status,
+#         "task_id": document.task_id,
+#         "retry_count": document.retry_count,
+#         "processing_time": document.processing_time,
+#         "extraction_method": document.extraction_method,
+#         "error": document.extraction_error
+#     }
+
+
+# @router.get("/{document_id}", response_model=DocumentResponse)
+# def get_document(
+#     document_id: int,
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get document metadata by ID (only if user owns it)."""
+#     # document = db.query(Document).filter(
+#     #     Document.id == document_id,
+#     #     Document.user_id == current_user.id
+#     # ).first()
+
+#     document = check_document_access(
+#         document_id, 
+#         current_user, 
+#         SharePermission.VIEW, 
+#         db
+#     )
+    
+#     if not document:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Document with id {document_id} not found"
+#         )
+    
+#     return document
+
+#     # document = check_document_access(
+#     #     document_id, 
+#     #     current_user, 
+#     #     SharePermission.VIEW, 
+#     #     db
+#     # )
+#     # return document
+
+
+# @router.get("/{document_id}/download")
+# def download_document(
+#     document_id: int,
+#     request: Request,
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Download the actual document file (only if user owns it)."""
+#     # document = db.query(Document).filter(
+#     #     Document.id == document_id,
+#     #     Document.user_id == current_user.id
+#     # ).first()
+
+#     document = check_document_access(
+#         document_id,
+#         current_user,
+#         SharePermission.DOWNLOAD,
+#         db
+#     )
+    
+#     if not document:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Document with id {document_id} not found"
+#         )
+    
+#     try:
+#         file_data = storage_service.download_file(document.storage_path)
+        
+#         audit_service.log(
+#         db=db,
+#         action=AuditAction.DOCUMENT_DOWNLOAD,
+#         user=current_user,
+#         resource_type="document",
+#         resource_id=document.id,
+#         description=f"Downloaded document: {document.original_filename}",
+#         request=request
+#     )
+        
+#         return StreamingResponse(
+#             BytesIO(file_data),
+#             media_type=document.file_type,
+#             headers={
+#                 "Content-Disposition": f'attachment; filename="{document.original_filename}"'
+#             }
+#         )
+        
+#     except Exception as e:
+#         logger.error(f"Error downloading document {document_id}: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Failed to download document"
+#         )
+
+
+# @router.get("/", response_model=DocumentList)
+# def list_documents(
+#     request: Request,
+#     page: int = Query(1, ge=1),
+#     page_size: int = Query(10, ge=1, le=100),
+#     status_filter: Optional[DocumentStatus] = None,
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """List all documents (only user's documents)."""
+#     if page < 1:
+#         page = 1
+#     if page_size < 1 or page_size > 100:
+#         page_size = 10
+    
+#     offset = (page - 1) * page_size
+    
+#     # Filter by user_id
+#     query = db.query(Document).filter(Document.user_id == current_user.id)
+    
+#     if status_filter:
+#         query = query.filter(Document.status == status_filter)
+    
+#     total = query.count()
+    
+#     documents = query\
+#         .order_by(Document.created_at.desc())\
+#         .offset(offset)\
+#         .limit(page_size)\
+#         .all()
+    
+#     return {
+#         "total": total,
+#         "items": documents,
+#         "page": page,
+#         "page_size": page_size
+#     }
+
+
+# @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+# def delete_document(
+#     document_id: int,
+#     request: Request,
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Delete a document (only if user owns it)."""
+#     document = db.query(Document).filter(
+#         Document.id == document_id,
+#         Document.user_id == current_user.id
+#     ).first()
+    
+#     if not document:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Document with id {document_id} not found"
+#         )
+    
+#     try:
+#         storage_service.delete_file(document.storage_path)
+#         db.delete(document)
+#         db.commit()
+        
+#         logger.info(f"Document deleted successfully: {document_id}")
+        
+#         audit_service.log(
+#         db=db,
+#         action=AuditAction.DOCUMENT_DELETE,
+#         user=current_user,
+#         resource_type="document",
+#         resource_id=document_id,
+#         description=f"Deleted document: {document.original_filename}",
+#         request=request
+#     )
+    
+#         return None
+        
+#     except Exception as e:
+#         logger.error(f"Error deleting document {document_id}: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Failed to delete document"
+#         )
+
+# def check_document_access(
+#     document_id: int,
+#     current_user: User,
+#     required_permission: SharePermission,
+#     db: Session
+# ) -> Document:
+#     """Check if user has access to document (owner or shared)."""
+    
+#     # Check if user owns the document
+#     document = db.query(Document).filter(
+#         Document.id == document_id,
+#         Document.user_id == current_user.id
+#     ).first()
+    
+#     if document:
+#         return document  # Owner has all permissions
+    
+#     # Check if document is shared with user
+#     share = db.query(DocumentShare).filter(
+#         DocumentShare.document_id == document_id,
+#         DocumentShare.shared_with_user_id == current_user.id,
+#         DocumentShare.is_active == True
+#     ).first()
+    
+#     if not share:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="Document not found or access denied"
+#         )
+    
+#     # Check if expired
+#     if share.is_expired():
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="Share has expired"
+#         )
+    
+#     # Check permission level
+#     if required_permission == SharePermission.DOWNLOAD and share.permission == SharePermission.VIEW:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="You don't have download permission for this document"
+#         )
+    
+#     if required_permission == SharePermission.EDIT and share.permission != SharePermission.EDIT:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="You don't have edit permission for this document"
+#         )
+    
+#     # Get the document
+#     document = db.query(Document).filter(Document.id == document_id).first()
+#     return document
+
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from io import BytesIO
 import logging
-# from app.tasks.extraction_tasks import process_document
-from app.celery_app import celery_app
-from app.tasks import extraction_tasks
+
 from app.database import get_db
 from app.models.document import Document, DocumentStatus
+from app.models.user import User
 from app.schemas.document import DocumentResponse, DocumentList, ExtractionResult
 from app.services.storage import storage_service
 from app.services.extraction import extraction_service
-from app.services.ai_service import ai_service
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
-from app.middleware.rate_limit import limiter
-from app.services.audit_service import audit_service
-from app.models.audit_log import AuditAction
-
 from app.utils.file_utils import (
     generate_unique_filename,
     generate_storage_path,
@@ -29,13 +494,73 @@ from app.utils.file_utils import (
 from app.config import settings
 from app.tasks.extraction_tasks import process_document
 from app.dependencies import get_current_user, get_optional_user
-from app.models.user import User
+from app.middleware.rate_limit import limiter
+from app.services.audit_service import audit_service
+from app.models.audit_log import AuditAction
+from app.models.document_share import DocumentShare, SharePermission  # ADD THIS LINE
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# Helper function to check document access
+def check_document_access(
+    document_id: int,
+    current_user: User,
+    required_permission: SharePermission,
+    db: Session
+) -> Document:
+    """Check if user has access to document (owner or shared)."""
+    
+    # Check if user owns the document
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    
+    if document:
+        return document  # Owner has all permissions
+    
+    # Check if document is shared with user
+    share = db.query(DocumentShare).filter(
+        DocumentShare.document_id == document_id,
+        DocumentShare.shared_with_user_id == current_user.id,
+        DocumentShare.is_active == True
+    ).first()
+    
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found or access denied"
+        )
+    
+    # Check if expired
+    if share.is_expired():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Share has expired"
+        )
+    
+    # Check permission level
+    if required_permission == SharePermission.DOWNLOAD and share.permission == SharePermission.VIEW:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have download permission for this document"
+        )
+    
+    if required_permission == SharePermission.EDIT and share.permission != SharePermission.EDIT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have edit permission for this document"
+        )
+    
+    # Get the document
+    document = db.query(Document).filter(Document.id == document_id).first()
+    return document
+
+
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("1000/hour")
 async def upload_document(
     request: Request,
     file: UploadFile = File(...),
@@ -44,10 +569,10 @@ async def upload_document(
     db: Session = Depends(get_db)
 ):
     """
-    Upload a document file (requires authentication).
-    
-    - process_async=True: Process in background (recommended for large files)
-    - process_async=False: Process immediately (blocks until complete)
+    Upload a document file and optionally extract text immediately.
+    Supports: PDF, PNG, JPG, DOCX, XLSX, EML
+    Max size: 50MB
+    Rate limited: 100 uploads per hour
     """
     try:
         # Read file content
@@ -68,7 +593,7 @@ async def upload_document(
         if not validate_file_type(detected_mime_type):
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                detail=f"File type '{detected_mime_type}' not supported."
+                detail=f"File type '{detected_mime_type}' not supported. Allowed types: {', '.join(settings.ALLOWED_FILE_TYPES)}"
             )
         
         # Generate unique filename and storage path
@@ -86,7 +611,7 @@ async def upload_document(
             }
         )
         
-        # Create document record
+        # Save metadata to database
         db_document = Document(
             filename=unique_filename,
             original_filename=file.filename,
@@ -101,69 +626,37 @@ async def upload_document(
         db.commit()
         db.refresh(db_document)
         
-        logger.info(f"Document uploaded successfully by user {current_user.username}: {db_document.id} - {file.filename}")
+        logger.info(f"Document uploaded successfully: {db_document.id} - {file.filename}")
+        
+        # Audit log
+        audit_service.log(
+            db=db,
+            action=AuditAction.DOCUMENT_UPLOAD,
+            user=current_user,
+            resource_type="document",
+            resource_id=db_document.id,
+            description=f"Uploaded document: {file.filename}",
+            metadata={
+                "filename": file.filename,
+                "file_size": file_size,
+                "file_type": detected_mime_type
+            },
+            request=request
+        )
         
         # Process extraction
         if process_async:
             # Queue background task
-            # task = process_document.delay(db_document.id, use_ai=True)
-            task = celery_app.send_task(
-            'app.tasks.extraction_tasks.process_document',
-            args=[db_document.id, True]
-        )
+            task = process_document.delay(db_document.id, use_ai=True)
             db_document.task_id = task.id
             db_document.status = DocumentStatus.PROCESSING
             db.commit()
             db.refresh(db_document)
             
             logger.info(f"Queued extraction task {task.id} for document {db_document.id}")
-        else:
-            # Process immediately (synchronous)
-            try:
-                db_document.status = DocumentStatus.PROCESSING
-                db.commit()
-                
-                extracted_text, page_count, method, error = extraction_service.extract_text(
-                    file_content, detected_mime_type
-                )
-                
-                if error:
-                    db_document.status = DocumentStatus.FAILED
-                    db_document.extraction_error = error
-                else:
-                    db_document.status = DocumentStatus.COMPLETED
-                    db_document.extracted_text = extracted_text
-                    db_document.page_count = page_count
-                    db_document.extraction_method = method
-                
-                db.commit()
-                db.refresh(db_document)
-                
-            except Exception as e:
-                logger.error(f"Error during immediate extraction: {e}")
-                db_document.status = DocumentStatus.FAILED
-                db_document.extraction_error = str(e)
-                db.commit()
         
         db.refresh(db_document)
-
-        audit_service.log(
-        db=db,
-        action=AuditAction.DOCUMENT_UPLOAD,
-        user=current_user,
-        resource_type="document",
-        resource_id=db_document.id,
-        description=f"Uploaded document: {file.filename}",
-        metadata={
-            "filename": file.filename,
-            "file_size": file_size,
-            "file_type": detected_mime_type
-        },
-        request=request
-    )
-    
         return db_document
-
         
     except HTTPException:
         raise
@@ -178,12 +671,11 @@ async def upload_document(
 @router.post("/{document_id}/process", response_model=DocumentResponse)
 def reprocess_document(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Queue a document for reprocessing (only if user owns it).
-    """
+    """Queue a document for reprocessing."""
     document = db.query(Document).filter(
         Document.id == document_id,
         Document.user_id == current_user.id
@@ -216,13 +708,8 @@ def get_document_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Get the current processing status of a document.
-    """
-    document = db.query(Document).filter(
-        Document.id == document_id,
-        Document.user_id == current_user.id
-    ).first()
+    """Get the current processing status of a document."""
+    document = check_document_access(document_id, current_user, SharePermission.VIEW, db)
     
     if not document:
         raise HTTPException(
@@ -242,16 +729,15 @@ def get_document_status(
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
+@limiter.limit("200/hour")
 def get_document(
+    request: Request,
     document_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get document metadata by ID (only if user owns it)."""
-    document = db.query(Document).filter(
-        Document.id == document_id,
-        Document.user_id == current_user.id
-    ).first()
+    """Get document metadata by ID (owner or shared with view permission)."""
+    document = check_document_access(document_id, current_user, SharePermission.VIEW, db)
     
     if not document:
         raise HTTPException(
@@ -269,11 +755,8 @@ def download_document(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Download the actual document file (only if user owns it)."""
-    document = db.query(Document).filter(
-        Document.id == document_id,
-        Document.user_id == current_user.id
-    ).first()
+    """Download the actual document file (requires download permission)."""
+    document = check_document_access(document_id, current_user, SharePermission.DOWNLOAD, db)
     
     if not document:
         raise HTTPException(
@@ -284,15 +767,16 @@ def download_document(
     try:
         file_data = storage_service.download_file(document.storage_path)
         
+        # Audit log
         audit_service.log(
-        db=db,
-        action=AuditAction.DOCUMENT_DOWNLOAD,
-        user=current_user,
-        resource_type="document",
-        resource_id=document.id,
-        description=f"Downloaded document: {document.original_filename}",
-        request=request
-    )
+            db=db,
+            action=AuditAction.DOCUMENT_DOWNLOAD,
+            user=current_user,
+            resource_type="document",
+            resource_id=document.id,
+            description=f"Downloaded document: {document.original_filename}",
+            request=request
+        )
         
         return StreamingResponse(
             BytesIO(file_data),
@@ -311,15 +795,16 @@ def download_document(
 
 
 @router.get("/", response_model=DocumentList)
+@limiter.limit("2000/hour")
 def list_documents(
     request: Request,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page: int = 1,
+    page_size: int = 10,
     status_filter: Optional[DocumentStatus] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List all documents (only user's documents)."""
+    """List all documents (user's own documents + documents shared with them)."""
     if page < 1:
         page = 1
     if page_size < 1 or page_size > 100:
@@ -327,8 +812,10 @@ def list_documents(
     
     offset = (page - 1) * page_size
     
-    # Filter by user_id
+    # Get user's own documents
     query = db.query(Document).filter(Document.user_id == current_user.id)
+    
+    # TODO: Also include shared documents (left as exercise or future enhancement)
     
     if status_filter:
         query = query.filter(Document.status == status_filter)
@@ -356,7 +843,7 @@ def delete_document(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a document (only if user owns it)."""
+    """Delete a document (both file and metadata) - owner only."""
     document = db.query(Document).filter(
         Document.id == document_id,
         Document.user_id == current_user.id
@@ -369,22 +856,25 @@ def delete_document(
         )
     
     try:
+        # Delete from MinIO
         storage_service.delete_file(document.storage_path)
+        
+        # Audit log before deletion
+        audit_service.log(
+            db=db,
+            action=AuditAction.DOCUMENT_DELETE,
+            user=current_user,
+            resource_type="document",
+            resource_id=document_id,
+            description=f"Deleted document: {document.original_filename}",
+            request=request
+        )
+        
+        # Delete from database
         db.delete(document)
         db.commit()
         
         logger.info(f"Document deleted successfully: {document_id}")
-        
-        audit_service.log(
-        db=db,
-        action=AuditAction.DOCUMENT_DELETE,
-        user=current_user,
-        resource_type="document",
-        resource_id=document_id,
-        description=f"Deleted document: {document.original_filename}",
-        request=request
-    )
-    
         return None
         
     except Exception as e:
