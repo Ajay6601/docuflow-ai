@@ -15,6 +15,9 @@ from app.services.extraction import extraction_service
 from app.services.ai_service import ai_service
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from app.middleware.rate_limit import limiter
+from app.services.audit_service import audit_service
+from app.models.audit_log import AuditAction
+
 from app.utils.file_utils import (
     generate_unique_filename,
     generate_storage_path,
@@ -143,7 +146,24 @@ async def upload_document(
                 db.commit()
         
         db.refresh(db_document)
+
+        audit_service.log(
+        db=db,
+        action=AuditAction.DOCUMENT_UPLOAD,
+        user=current_user,
+        resource_type="document",
+        resource_id=db_document.id,
+        description=f"Uploaded document: {file.filename}",
+        metadata={
+            "filename": file.filename,
+            "file_size": file_size,
+            "file_type": detected_mime_type
+        },
+        request=request
+    )
+    
         return db_document
+
         
     except HTTPException:
         raise
@@ -245,6 +265,7 @@ def get_document(
 @router.get("/{document_id}/download")
 def download_document(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -262,6 +283,16 @@ def download_document(
     
     try:
         file_data = storage_service.download_file(document.storage_path)
+        
+        audit_service.log(
+        db=db,
+        action=AuditAction.DOCUMENT_DOWNLOAD,
+        user=current_user,
+        resource_type="document",
+        resource_id=document.id,
+        description=f"Downloaded document: {document.original_filename}",
+        request=request
+    )
         
         return StreamingResponse(
             BytesIO(file_data),
@@ -321,6 +352,7 @@ def list_documents(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -342,6 +374,17 @@ def delete_document(
         db.commit()
         
         logger.info(f"Document deleted successfully: {document_id}")
+        
+        audit_service.log(
+        db=db,
+        action=AuditAction.DOCUMENT_DELETE,
+        user=current_user,
+        resource_type="document",
+        resource_id=document_id,
+        description=f"Deleted document: {document.original_filename}",
+        request=request
+    )
+    
         return None
         
     except Exception as e:
