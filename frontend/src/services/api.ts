@@ -157,4 +157,56 @@ export const searchApi = {
   },
 }
 
+export const analyticsApi = {
+  // Get overview statistics
+  getOverview: async () => {
+    const response = await api.get('/analytics/overview')
+    return response.data
+  },
+
+  // Get document types distribution
+  getDocumentTypes: async () => {
+    const response = await api.get('/analytics/document-types')
+    return response.data
+  },
+
+  // Get upload timeline
+  getUploadTimeline: async (days: number = 7) => {
+    const response = await api.get('/analytics/upload-timeline', {
+      params: { days }
+    })
+    return response.data
+  },
+
+  // Get processing stats
+  getProcessingStats: async (days: number = 7) => {
+    const response = await api.get('/analytics/processing-stats', {
+      params: { days }
+    })
+    return response.data
+  },
+
+  // Get cost tracking
+  getCostTracking: async (days: number = 30) => {
+    const response = await api.get('/analytics/cost-tracking', {
+      params: { days }
+    })
+    return response.data
+  },
+
+  // Get extraction methods
+  getExtractionMethods: async () => {
+    const response = await api.get('/analytics/extraction-methods')
+    return response.data
+  },
+
+  // Get recent activity
+  getRecentActivity: async (limit: number = 10) => {
+    const response = await api.get('/analytics/recent-activity', {
+      params: { limit }
+    })
+    return response.data
+  },
+}
+
 export default api

@@ -13,6 +13,8 @@ from app.schemas.document import DocumentResponse, DocumentList, ExtractionResul
 from app.services.storage import storage_service
 from app.services.extraction import extraction_service
 from app.services.ai_service import ai_service
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
+from app.middleware.rate_limit import limiter
 from app.utils.file_utils import (
     generate_unique_filename,
     generate_storage_path,
@@ -32,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     process_async: bool = Form(default=True),
     current_user: User = Depends(get_current_user),
@@ -278,6 +281,7 @@ def download_document(
 
 @router.get("/", response_model=DocumentList)
 def list_documents(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     status_filter: Optional[DocumentStatus] = None,

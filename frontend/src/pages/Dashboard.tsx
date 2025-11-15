@@ -1,20 +1,27 @@
 import React, { useState } from 'react'
-import { FileText, Upload as UploadIcon, Search as SearchIcon, LogOut, User as UserIcon } from 'lucide-react'
+import { 
+  FileText, 
+  Upload as UploadIcon, 
+  Search as SearchIcon, 
+  LogOut, 
+  User as UserIcon,
+  BarChart3  // NEW
+} from 'lucide-react'
 import { UploadZone } from '../components/documents/UploadZone'
 import { DocumentList } from '../components/documents/DocumentList'
 import { SearchBar } from '../components/documents/SearchBar'
+import { Analytics } from './Analytics'  // NEW
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { useWebSocket } from '../hooks/useWebSocket'
 // import { useAuthStore } from '../store/authStore'
-import { useAuthStore } from '../store/authSore'
 import { useNavigate } from 'react-router-dom'
-
+import { useAuthStore } from '../store/authSore'
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<'documents' | 'upload' | 'search'>('documents')
+  const [activeTab, setActiveTab] = useState<'documents' | 'upload' | 'search' | 'analytics'>('documents')  // UPDATED
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { isConnected, messages } = useWebSocket()
@@ -29,7 +36,6 @@ export const Dashboard: React.FC = () => {
     navigate('/login')
   }
 
-  // Listen for WebSocket updates
   React.useEffect(() => {
     const lastMessage = messages[messages.length - 1]
     if (lastMessage && lastMessage.type === 'document_status') {
@@ -80,7 +86,7 @@ export const Dashboard: React.FC = () => {
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1">
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1 z-50">
                     <div className="px-4 py-2 border-b">
                       <p className="text-sm font-medium">{user?.username}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
@@ -144,6 +150,21 @@ export const Dashboard: React.FC = () => {
             <SearchIcon className="h-4 w-4" />
             Search
           </button>
+
+          {/* NEW - Analytics Tab */}
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`
+              px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2
+              ${activeTab === 'analytics' 
+                ? 'bg-primary text-white' 
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+              }
+            `}
+          >
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+          </button>
         </div>
 
         {/* Content */}
@@ -180,10 +201,13 @@ export const Dashboard: React.FC = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* NEW - Analytics Content */}
+          {activeTab === 'analytics' && <Analytics />}
         </div>
 
         {/* Recent Activity */}
-        {messages.length > 0 && (
+        {messages.length > 0 && activeTab !== 'analytics' && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
