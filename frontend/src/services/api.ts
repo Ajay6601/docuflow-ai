@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Document, DocumentListResponse, SearchResponse } from '../types/document'
+import { Document, DocumentListResponse, SearchResponse } from '../types/document'
 
 const API_BASE_URL = 'http://localhost:8000/api/v1'
 
@@ -9,6 +9,64 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// Add token to requests if available
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Handle 401 responses (unauthorized)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('user')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+// Auth API
+export const authApi = {
+  // Register new user
+  register: async (email: string, username: string, password: string, fullName?: string) => {
+    const response = await api.post('/auth/register', {
+      email,
+      username,
+      password,
+      full_name: fullName,
+    })
+    return response.data
+  },
+
+  // Login - UPDATED to use JSON endpoint
+  login: async (username: string, password: string) => {
+    const response = await api.post('/auth/login/json', {
+      username,
+      password,
+    })
+    return response.data
+  },
+
+  // Get current user
+  getCurrentUser: async () => {
+    const response = await api.get('/auth/me')
+    return response.data
+  },
+
+  // Logout
+  logout: async () => {
+    const response = await api.post('/auth/logout')
+    return response.data
+  },
+}
 
 export const documentApi = {
   // Upload document
@@ -27,7 +85,7 @@ export const documentApi = {
 
   // List documents
   list: async (page: number = 1, pageSize: number = 10, statusFilter?: string): Promise<DocumentListResponse> => {
-    const params: Record<string, any> = { page, page_size: pageSize }
+    const params: any = { page, page_size: pageSize }
     if (statusFilter) params.status_filter = statusFilter
     
     const response = await api.get('/documents/', { params })
@@ -70,7 +128,6 @@ export const documentApi = {
     document.body.appendChild(link)
     link.click()
     link.remove()
-    window.URL.revokeObjectURL(url)
   },
 }
 

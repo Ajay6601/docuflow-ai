@@ -1,14 +1,22 @@
 import React, { useState } from 'react'
-import { FileText, Upload as UploadIcon, Search as SearchIcon } from 'lucide-react'
+import { FileText, Upload as UploadIcon, Search as SearchIcon, LogOut, User as UserIcon } from 'lucide-react'
 import { UploadZone } from '../components/documents/UploadZone'
 import { DocumentList } from '../components/documents/DocumentList'
 import { SearchBar } from '../components/documents/SearchBar'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
 import { useWebSocket } from '../hooks/useWebSocket'
+// import { useAuthStore } from '../store/authStore'
+import { useAuthStore } from '../store/authSore'
+import { useNavigate } from 'react-router-dom'
 
 export const Dashboard: React.FC = () => {
+  const navigate = useNavigate()
+  const { user, logout } = useAuthStore()
   const [activeTab, setActiveTab] = useState<'documents' | 'upload' | 'search'>('documents')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   const { isConnected, messages } = useWebSocket()
 
   const handleUploadSuccess = () => {
@@ -16,11 +24,15 @@ export const Dashboard: React.FC = () => {
     setActiveTab('documents')
   }
 
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
   // Listen for WebSocket updates
   React.useEffect(() => {
     const lastMessage = messages[messages.length - 1]
     if (lastMessage && lastMessage.type === 'document_status') {
-      // Refresh document list when status changes
       if (lastMessage.status === 'completed' || lastMessage.status === 'failed') {
         setRefreshTrigger(prev => prev + 1)
       }
@@ -43,12 +55,46 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* WebSocket Status */}
-            <div className="flex items-center gap-2">
-              <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-sm text-gray-600">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
+            <div className="flex items-center gap-4">
+              {/* WebSocket Status */}
+              <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="text-sm text-gray-600">
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+
+              {/* User Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div className="p-2 bg-primary/10 rounded-full">
+                    <UserIcon className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium">{user?.full_name || user?.username}</p>
+                    <Badge variant="outline" className="text-xs">{user?.role}</Badge>
+                  </div>
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1">
+                    <div className="px-4 py-2 border-b">
+                      <p className="text-sm font-medium">{user?.username}</p>
+                      <p className="text-xs text-gray-500">{user?.email}</p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -105,7 +151,7 @@ export const Dashboard: React.FC = () => {
           {activeTab === 'documents' && (
             <Card>
               <CardHeader>
-                <CardTitle>All Documents</CardTitle>
+                <CardTitle>My Documents</CardTitle>
               </CardHeader>
               <CardContent>
                 <DocumentList refreshTrigger={refreshTrigger} />
@@ -136,7 +182,7 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Recent Activity (WebSocket Messages) */}
+        {/* Recent Activity */}
         {messages.length > 0 && (
           <Card className="mt-6">
             <CardHeader>

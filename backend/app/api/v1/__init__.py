@@ -1,7 +1,14 @@
 from fastapi import APIRouter
-from app.api.v1 import documents, websocket, search
+from app.api.v1 import documents, websocket, search, auth
 
 api_router = APIRouter()
+
+# Include auth routes
+api_router.include_router(
+    auth.router,
+    prefix="/auth",
+    tags=["authentication"]
+)
 
 # Include document routes
 api_router.include_router(

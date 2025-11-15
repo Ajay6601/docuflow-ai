@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, BigInteger, Text, Float, JSON, Index
+from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, BigInteger, Text, Float, JSON, Index, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
 from app.database import Base
 import enum
@@ -35,10 +36,12 @@ class Document(Base):
     file_type = Column(String(100), nullable=False)
     storage_path = Column(String(500), nullable=False)
     
-    # FIX: Just use String type with the native PostgreSQL enum
+    # NEW - User ownership
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+    
     status = Column(
-        String(50),
-        default="uploaded",
+        SQLEnum(DocumentStatus),
+        default=DocumentStatus.UPLOADED,
         nullable=False,
         index=True
     )
@@ -56,8 +59,8 @@ class Document(Base):
     
     # AI fields
     document_type = Column(
-        String(50),
-        default="unknown",
+        SQLEnum(DocumentType),
+        default=DocumentType.UNKNOWN,
         nullable=False,
         index=True
     )
@@ -76,6 +79,7 @@ class Document(Base):
     # Indexes
     __table_args__ = (
         Index('ix_documents_search_vector', 'search_vector', postgresql_using='gin'),
+        Index('ix_documents_embedding', 'embedding', postgresql_using='ivfflat', postgresql_ops={'embedding': 'vector_cosine_ops'}),
     )
     
     def __repr__(self):

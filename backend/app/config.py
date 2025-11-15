@@ -25,15 +25,14 @@ class Settings(BaseSettings):
     # File Upload
     MAX_FILE_SIZE: int = 52428800
     ALLOWED_FILE_TYPES: List[str] = [
-    "application/pdf",
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "message/rfc822",
-    "text/plain"  # NEW - for testing
-]
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "message/rfc822"
+    ]
     
     # Celery/Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -44,6 +43,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4-turbo-preview"
     OPENAI_MAX_TOKENS: int = 4000
+    
+    # Authentication
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     class Config:
         env_file = ".env"

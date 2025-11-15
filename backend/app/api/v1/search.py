@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.database import get_db
-from app.models.document import DocumentStatus, DocumentType
+from app.models.document import DocumentStatus, DocumentType, Document
 from app.services.search_service import search_service
+from app.dependencies import get_current_user
+from app.models.user import User
 from pydantic import BaseModel
 import logging
 
@@ -40,18 +42,14 @@ def search_full_text(
     q: str = Query(..., description="Search query"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    status: Optional[str] = None,  # Changed from DocumentStatus
-    doc_type: Optional[str] = None,  # Changed from DocumentType
+    status: Optional[DocumentStatus] = None,
+    doc_type: Optional[DocumentType] = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Full-text search using PostgreSQL tsvector.
     Best for: exact keyword matching, document titles, specific terms.
-    
-    Examples:
-    - "invoice 2024"
-    - "contract agreement"
-    - "john doe resume"
     """
     offset = (page - 1) * page_size
     
@@ -63,6 +61,10 @@ def search_full_text(
         status_filter=status,
         type_filter=doc_type
     )
+    
+    # Filter by user
+    documents = [doc for doc in documents if doc.user_id == current_user.id]
+    total = len(documents)
     
     results = [
         SearchResult(
@@ -93,19 +95,15 @@ def search_semantic(
     q: str = Query(..., description="Search query"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    status: Optional[str] = None,
-    doc_type: Optional[str] = None,
+    status: Optional[DocumentStatus] = None,
+    doc_type: Optional[DocumentType] = None,
     similarity_threshold: float = Query(0.3, ge=0.0, le=1.0),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Semantic search using AI embeddings.
     Best for: conceptual searches, meaning-based queries, natural language.
-    
-    Examples:
-    - "documents about payment terms"
-    - "contracts with termination clauses"
-    - "resumes with machine learning experience"
     """
     offset = (page - 1) * page_size
     
@@ -118,6 +116,10 @@ def search_semantic(
         type_filter=doc_type,
         similarity_threshold=similarity_threshold
     )
+    
+    # Filter by user
+    results_with_scores = [(doc, score) for doc, score in results_with_scores if doc.user_id == current_user.id]
+    total = len(results_with_scores)
     
     results = [
         SearchResult(
@@ -148,23 +150,16 @@ def search_hybrid(
     q: str = Query(..., description="Search query"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    status: Optional[str] = None,
-    doc_type: Optional[str] = None,
+    status: Optional[DocumentStatus] = None,
+    doc_type: Optional[DocumentType] = None,
     text_weight: float = Query(0.5, ge=0.0, le=1.0),
     semantic_weight: float = Query(0.5, ge=0.0, le=1.0),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Hybrid search combining full-text and semantic search.
     Best for: most accurate results, balanced keyword and meaning search.
-    
-    Weights:
-    - text_weight: Importance of exact keyword matches (0-1)
-    - semantic_weight: Importance of semantic similarity (0-1)
-    
-    Examples:
-    - "invoice from acme corp" (will match both keywords and context)
-    - "employment contract developer" (combines exact terms + semantics)
     """
     offset = (page - 1) * page_size
     
@@ -178,6 +173,10 @@ def search_hybrid(
         text_weight=text_weight,
         semantic_weight=semantic_weight
     )
+    
+    # Filter by user
+    results_with_scores = [(doc, score) for doc, score in results_with_scores if doc.user_id == current_user.id]
+    total = len(results_with_scores)
     
     results = [
         SearchResult(
